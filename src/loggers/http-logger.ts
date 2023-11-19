@@ -1,25 +1,26 @@
-import { createLogger, format, transports, config } from 'winston';
+import { LOGTAIL_TOKEN } from '../constants';
+
+import { createLogger, format, transports } from 'winston';
 import 'winston-daily-rotate-file';
 const { combine, timestamp, json, printf, errors } = format;
 
-const isDevelepmentEnvironment = process.env.ENVIRONMENT == 'development';
+import { Logtail } from '@logtail/node';
+import { LogtailTransport } from '@logtail/winston';
+const logtail = new Logtail(LOGTAIL_TOKEN);
 
 const cliLogFormat = printf(({ level, message, timestamp }) => {
 	return `${timestamp} | ${level}: ${message}`;
 });
 
 const fileRotateTransport = new transports.DailyRotateFile({
-	filename: './logs/%DATE%.log',
+	filename: './logs/http-requests-%DATE%.log',
 	datePattern: 'YYYY-MM-DD',
-	maxFiles: '28d',
+	maxFiles: '3d',
 	format: json(),
 });
 
-// FALTA LOGGEAR ERRORES NO TRATADOS
-
-const logger = createLogger({
-	levels: config.syslog.levels,
-	level: isDevelepmentEnvironment ? 'debug' : 'warning',
+const httpLogger = createLogger({
+	level: 'http',
 	format: combine(
 		errors({ stack: true }),
 		json(),
@@ -32,20 +33,17 @@ const logger = createLogger({
 		fileRotateTransport,
 		new transports.Console(),
 		new transports.File({
-			filename: './logs/api.log',
-			format: json(),
-		}),
-		new transports.File({
-			filename: './logs/api-errors.log',
-			level: 'warning',
+			filename: './dev-logs/http-requests.log',
 			format: json(),
 		}),
 		new transports.Http({
-			level: 'debug',
+			level: 'http',
 			format: json(),
+			host: 'localhost',
 		}),
+		new LogtailTransport(logtail),
 	],
 	exitOnError: false,
 });
 
-export default logger;
+export { httpLogger };
